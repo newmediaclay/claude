@@ -42,8 +42,8 @@ STAGES = [
 ]
 
 STAGE_COLORS = {
-    "contact": "#2563eb",
-    "proposal_sent": "#7c3aed",
+    "contact": "#0077ff",
+    "proposal_sent": "#7eb8da",
     "won": "#059669",
     "lost": "#6b7280",
 }
@@ -150,86 +150,90 @@ HTML_TEMPLATE = """
         }
         .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
 
-        /* Header */
+        /* Header - Compact */
         header {
-            background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+            background: linear-gradient(135deg, #0f172a 0%, #0f172a 100%);
             color: white;
             padding: 0;
-            margin-bottom: 24px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            margin-bottom: 16px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
         }
         .header-content {
             max-width: 1400px;
             margin: 0 auto;
-            padding: 24px 20px;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
         }
         .brand {
             display: flex;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 8px;
+            gap: 10px;
         }
         .logo {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-            border-radius: 8px;
+            width: 32px;
+            height: 32px;
+            background: #0077ff;
+            border-radius: 6px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            font-size: 1.2rem;
+            font-size: 0.9rem;
         }
         header h1 {
-            font-size: 1.5rem;
+            font-size: 1.1rem;
             font-weight: 600;
-            letter-spacing: -0.5px;
+            letter-spacing: -0.3px;
         }
         .tagline {
-            color: rgba(255,255,255,0.7);
-            font-size: 0.9rem;
-            margin-bottom: 16px;
+            color: rgba(255,255,255,0.6);
+            font-size: 0.75rem;
+            margin-left: 10px;
         }
         .stats {
             display: flex;
-            gap: 16px;
+            gap: 8px;
             flex-wrap: wrap;
         }
         .stat-card {
-            background: rgba(255,255,255,0.1);
-            backdrop-filter: blur(10px);
-            padding: 12px 20px;
-            border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.08);
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.08);
+            text-align: center;
         }
         .stat-value {
-            font-size: 1.4rem;
+            font-size: 1rem;
             font-weight: 600;
         }
         .stat-label {
-            font-size: 0.8rem;
-            opacity: 0.8;
+            font-size: 0.65rem;
+            opacity: 0.7;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.3px;
         }
 
         /* Welcome Section */
         .welcome {
             background: white;
-            border-radius: 12px;
-            padding: 24px;
-            margin-bottom: 24px;
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-            border-left: 4px solid #3b82f6;
+            border-left: 4px solid #0077ff;
         }
         .welcome h2 {
-            font-size: 1.1rem;
-            color: #1e3a5f;
-            margin-bottom: 8px;
+            font-size: 0.95rem;
+            color: #0f172a;
+            margin-bottom: 4px;
         }
         .welcome p {
             color: #64748b;
-            font-size: 0.95rem;
+            font-size: 0.85rem;
         }
 
         /* Alert Banner */
@@ -430,6 +434,11 @@ HTML_TEMPLATE = """
             color: #374151;
             font-size: 0.9rem;
         }
+        .form-group label .required {
+            color: #ef4444;
+            font-weight: 700;
+            font-size: 1.1em;
+        }
         .form-group input, .form-group select, .form-group textarea {
             width: 100%;
             padding: 12px;
@@ -440,12 +449,27 @@ HTML_TEMPLATE = """
         }
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
             outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            border-color: #0077ff;
+            box-shadow: 0 0 0 3px rgba(0, 119, 255, 0.15);
         }
         .form-group textarea { resize: vertical; min-height: 100px; }
         .form-row { display: flex; gap: 16px; }
         .form-row .form-group { flex: 1; }
+        /* Dollar sign input wrapper */
+        .input-with-prefix {
+            position: relative;
+        }
+        .input-with-prefix .prefix {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6b7280;
+            font-weight: 500;
+        }
+        .input-with-prefix input {
+            padding-left: 28px;
+        }
 
         /* Buttons */
         .btn {
@@ -458,13 +482,13 @@ HTML_TEMPLATE = """
             transition: all 0.2s;
         }
         .btn-primary {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            background: #0077ff;
             color: white;
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 2px 8px rgba(0, 119, 255, 0.3);
         }
         .btn-primary:hover {
-            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            background: #0066dd;
+            box-shadow: 0 4px 12px rgba(0, 119, 255, 0.4);
         }
         .btn-danger {
             background: #ef4444;
@@ -488,21 +512,21 @@ HTML_TEMPLATE = """
             position: fixed;
             bottom: 30px;
             right: 30px;
-            width: 64px;
-            height: 64px;
+            width: 56px;
+            height: 56px;
             border-radius: 50%;
-            font-size: 2rem;
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            font-size: 1.8rem;
+            background: #0077ff;
             color: white;
             border: none;
             cursor: pointer;
-            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+            box-shadow: 0 4px 15px rgba(0, 119, 255, 0.4);
             transition: all 0.2s;
             z-index: 50;
         }
         .btn-add:hover {
             transform: scale(1.1);
-            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.5);
+            box-shadow: 0 6px 20px rgba(0, 119, 255, 0.5);
         }
 
         /* Notes */
@@ -511,14 +535,22 @@ HTML_TEMPLATE = """
             background: #f8fafc;
             padding: 12px;
             border-radius: 8px;
-            margin-bottom: 8px;
-            font-size: 0.9rem;
-            border-left: 3px solid #3b82f6;
+            margin-bottom: 10px;
+            border-left: 3px solid #0077ff;
         }
         .note-date {
-            color: #64748b;
-            font-size: 0.8rem;
-            font-weight: 500;
+            display: block;
+            color: #94a3b8;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .note-text {
+            color: #374151;
+            font-size: 0.9rem;
+            line-height: 1.5;
         }
 
         .actions {
@@ -572,16 +604,16 @@ HTML_TEMPLATE = """
             <div class="brand">
                 <div class="logo">NM</div>
                 <h1>Sales Pipeline</h1>
+                <span class="tagline">New Media Campaigns</span>
             </div>
-            <p class="tagline">New Media Campaigns - Track, nurture, and close your deals</p>
             <div class="stats">
                 <div class="stat-card">
                     <div class="stat-value">{{ active_count }}</div>
-                    <div class="stat-label">Active Deals</div>
+                    <div class="stat-label">Active</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value">${{ "{:,.0f}".format(active_value) }}</div>
-                    <div class="stat-label">Pipeline Value</div>
+                    <div class="stat-label">Pipeline</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value">{{ won_count }}</div>
@@ -697,13 +729,16 @@ HTML_TEMPLATE = """
                 <form id="dealForm" method="POST">
                     <input type="hidden" name="id" id="dealId">
                     <div class="form-group">
-                        <label>Company / Deal Name *</label>
+                        <label>Company / Deal Name <span class="required">*</span></label>
                         <input type="text" name="name" id="dealName" required placeholder="Acme Corporation">
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Value ($)</label>
-                            <input type="number" name="value" id="dealValue" step="0.01" placeholder="50000">
+                            <label>Value</label>
+                            <div class="input-with-prefix">
+                                <span class="prefix">$</span>
+                                <input type="number" name="value" id="dealValue" step="0.01" placeholder="50000">
+                            </div>
                         </div>
                         <div class="form-group">
                             <label>Stage</label>
@@ -827,7 +862,7 @@ HTML_TEMPLATE = """
             if (deal.notes && deal.notes.length > 0) {
                 notesHtml = '<div class="notes-list"><strong>Notes:</strong>';
                 deal.notes.slice().reverse().forEach(note => {
-                    notesHtml += `<div class="note-item"><span class="note-date">${note.timestamp.slice(0,10)}</span> ${note.text}</div>`;
+                    notesHtml += `<div class="note-item"><span class="note-date">${note.timestamp.slice(0,10)}</span><div class="note-text">${note.text}</div></div>`;
                 });
                 notesHtml += '</div>';
             }
