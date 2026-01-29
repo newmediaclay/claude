@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Pipeline</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .deal-card { transition: transform 0.15s, box-shadow 0.15s; }
+        .deal-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+        .stage-column { min-height: 400px; }
+        .modal { backdrop-filter: blur(4px); }
+        .overdue { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-slate-800 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold">Sales Pipeline</h1>
+                <button onclick="showAddModal()" class="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg font-medium flex items-center gap-2">
+                    <span class="text-xl">+</span> New Deal
+                </button>
+            </div>
+            <div id="stats" class="flex gap-4 mt-3 text-sm opacity-90"></div>
+        </div>
+    </header>
+
+    <!-- Pipeline Board -->
+    <main class="max-w-7xl mx-auto px-4 py-6">
+        <div id="pipeline" class="flex gap-4 overflow-x-auto pb-4"></div>
+    </main>
+
+    <!-- Modal -->
+    <div id="modal" class="modal fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center p-5 border-b">
+                <h2 id="modalTitle" class="text-xl font-bold">Add Deal</h2>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            <form id="dealForm" class="p-5 space-y-4">
+                <input type="hidden" id="dealId">
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Company / Deal Name *</label>
+                    <input type="text" id="dealName" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Deal Value ($)</label>
+                        <input type="number" id="dealValue" step="0.01" min="0" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Stage</label>
+                        <select id="dealStage" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
+                    <input type="text" id="dealContact" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" id="dealEmail" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <input type="tel" id="dealPhone" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Follow-up Date</label>
+                    <input type="date" id="dealFollowup" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Add Note</label>
+                    <textarea id="dealNote" rows="2" placeholder="Add a note..." class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+
+                <div id="existingNotes" class="space-y-2"></div>
+
+                <div class="flex gap-3 pt-2">
+                    <button type="submit" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-medium">
+                        Save Deal
+                    </button>
+                    <button type="button" id="deleteBtn" onclick="deleteDeal()" class="hidden bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg font-medium">
+                        Delete
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    // ============================================================================
+    // CONFIGURATION - Customize these to match your sales process
+    // ============================================================================
+
+    const STAGES = [
+        { id: 'lead', name: 'Lead', color: 'bg-gray-500', icon: '○' },
+        { id: 'contacted', name: 'Contacted', color: 'bg-blue-500', icon: '◐' },
+        { id: 'qualified', name: 'Qualified', color: 'bg-purple-500', icon: '◑' },
+        { id: 'proposal', name: 'Proposal', color: 'bg-amber-500', icon: '◕' },
+        { id: 'negotiation', name: 'Negotiation', color: 'bg-orange-500', icon: '●' },
+        { id: 'won', name: 'Won', color: 'bg-green-500', icon: '✓' },
+        { id: 'lost', name: 'Lost', color: 'bg-gray-400', icon: '✗' },
+    ];
+
+    const STORAGE_KEY = 'salesPipelineData';
+
+    // ============================================================================
+    // DATA MANAGEMENT
+    // ============================================================================
+
+    function loadData() {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+            return JSON.parse(stored);
+        }
+        return { deals: [], nextId: 1 };
+    }
+
+    function saveData(data) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function getDealById(id) {
+        const data = loadData();
+        return data.deals.find(d => d.id === id);
+    }
+
+    // ============================================================================
+    // RENDERING
+    // ============================================================================
+
+    function formatCurrency(value) {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(value || 0);
+    }
+
+    function getToday() {
+        return new Date().toISOString().split('T')[0];
+    }
+
+    function renderPipeline() {
+        const data = loadData();
+        const pipeline = document.getElementById('pipeline');
+        const today = getToday();
+
+        // Group deals by stage
+        const dealsByStage = {};
+        STAGES.forEach(s => dealsByStage[s.id] = []);
+        data.deals.forEach(deal => {
+            if (dealsByStage[deal.stage]) {
+                dealsByStage[deal.stage].push(deal);
+            }
+        });
+
+        // Sort each stage by value (highest first)
+        Object.keys(dealsByStage).forEach(stage => {
+            dealsByStage[stage].sort((a, b) => (b.value || 0) - (a.value || 0));
+        });
+
+        // Render columns (exclude won/lost from main board, show at end)
+        const activeStages = STAGES.filter(s => !['won', 'lost'].includes(s.id));
+        const closedStages = STAGES.filter(s => ['won', 'lost'].includes(s.id));
+
+        let html = '';
+
+        [...activeStages, ...closedStages].forEach(stage => {
+            const deals = dealsByStage[stage.id];
+            const stageValue = deals.reduce((sum, d) => sum + (d.value || 0), 0);
+            const isClosedStage = ['won', 'lost'].includes(stage.id);
+
+            html += `
+                <div class="stage-column flex-shrink-0 w-72 bg-gray-200 rounded-lg flex flex-col">
+                    <div class="${stage.color} text-white p-3 rounded-t-lg">
+                        <div class="flex justify-between items-center">
+                            <span class="font-semibold">${stage.icon} ${stage.name}</span>
+                            <span class="bg-white/20 px-2 py-0.5 rounded text-sm">${deals.length}</span>
+                        </div>
+                        ${!isClosedStage ? `<div class="text-sm opacity-90 mt-1">${formatCurrency(stageValue)}</div>` : ''}
+                    </div>
+                    <div class="p-2 flex-1 overflow-y-auto space-y-2">
+                        ${deals.slice(0, isClosedStage ? 5 : 100).map(deal => renderDealCard(deal, today)).join('')}
+                        ${isClosedStage && deals.length > 5 ? `<div class="text-center text-gray-500 text-sm py-2">+${deals.length - 5} more</div>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+
+        pipeline.innerHTML = html;
+        renderStats();
+    }
+
+    function renderDealCard(deal, today) {
+        const isOverdue = deal.followupDate && deal.followupDate < today;
+        const isDueToday = deal.followupDate === today;
+
+        return `
+            <div class="deal-card bg-white rounded-lg p-3 shadow cursor-pointer" onclick="showEditModal(${deal.id})">
+                <h3 class="font-semibold text-gray-800 truncate">${escapeHtml(deal.name)}</h3>
+                <div class="text-green-600 font-bold text-lg mt-1">${formatCurrency(deal.value)}</div>
+                ${deal.contact ? `<div class="text-gray-500 text-sm mt-1 truncate">${escapeHtml(deal.contact)}</div>` : ''}
+                ${deal.followupDate ? `
+                    <div class="mt-2 text-xs px-2 py-1 rounded inline-block ${isOverdue ? 'bg-red-100 text-red-700 overdue' : isDueToday ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}">
+                        ${isOverdue ? '⚠ Overdue: ' : isDueToday ? '📅 Today: ' : '📅 '}${deal.followupDate}
+                    </div>
+                ` : ''}
+                ${deal.notes && deal.notes.length > 0 ? `<div class="text-gray-400 text-xs mt-2">📝 ${deal.notes.length} note${deal.notes.length > 1 ? 's' : ''}</div>` : ''}
+            </div>
+        `;
+    }
+
+    function renderStats() {
+        const data = loadData();
+        const activeDeals = data.deals.filter(d => !['won', 'lost'].includes(d.stage));
+        const wonDeals = data.deals.filter(d => d.stage === 'won');
+        const activeValue = activeDeals.reduce((sum, d) => sum + (d.value || 0), 0);
+        const wonValue = wonDeals.reduce((sum, d) => sum + (d.value || 0), 0);
+
+        const today = getToday();
+        const overdueCount = activeDeals.filter(d => d.followupDate && d.followupDate < today).length;
+        const dueTodayCount = activeDeals.filter(d => d.followupDate === today).length;
+
+        let statsHtml = `
+            <span class="bg-white/10 px-3 py-1 rounded">${activeDeals.length} active deals</span>
+            <span class="bg-white/10 px-3 py-1 rounded">${formatCurrency(activeValue)} pipeline</span>
+            <span class="bg-green-500/30 px-3 py-1 rounded">${wonDeals.length} won (${formatCurrency(wonValue)})</span>
+        `;
+
+        if (overdueCount > 0) {
+            statsHtml += `<span class="bg-red-500/30 px-3 py-1 rounded">${overdueCount} overdue</span>`;
+        }
+        if (dueTodayCount > 0) {
+            statsHtml += `<span class="bg-amber-500/30 px-3 py-1 rounded">${dueTodayCount} due today</span>`;
+        }
+
+        document.getElementById('stats').innerHTML = statsHtml;
+    }
+
+    function populateStageSelect() {
+        const select = document.getElementById('dealStage');
+        select.innerHTML = STAGES.map(s => `<option value="${s.id}">${s.icon} ${s.name}</option>`).join('');
+    }
+
+    // ============================================================================
+    // MODAL HANDLING
+    // ============================================================================
+
+    function showAddModal() {
+        document.getElementById('modalTitle').textContent = 'Add New Deal';
+        document.getElementById('dealForm').reset();
+        document.getElementById('dealId').value = '';
+        document.getElementById('deleteBtn').classList.add('hidden');
+        document.getElementById('existingNotes').innerHTML = '';
+        document.getElementById('modal').classList.remove('hidden');
+        document.getElementById('modal').classList.add('flex');
+        document.getElementById('dealName').focus();
+    }
+
+    function showEditModal(id) {
+        const deal = getDealById(id);
+        if (!deal) return;
+
+        document.getElementById('modalTitle').textContent = 'Edit Deal';
+        document.getElementById('dealId').value = deal.id;
+        document.getElementById('dealName').value = deal.name;
+        document.getElementById('dealValue').value = deal.value || '';
+        document.getElementById('dealStage').value = deal.stage;
+        document.getElementById('dealContact').value = deal.contact || '';
+        document.getElementById('dealEmail').value = deal.email || '';
+        document.getElementById('dealPhone').value = deal.phone || '';
+        document.getElementById('dealFollowup').value = deal.followupDate || '';
+        document.getElementById('dealNote').value = '';
+        document.getElementById('deleteBtn').classList.remove('hidden');
+
+        // Show existing notes
+        let notesHtml = '';
+        if (deal.notes && deal.notes.length > 0) {
+            notesHtml = '<div class="border-t pt-3"><h4 class="font-medium text-gray-700 mb-2">Previous Notes</h4>';
+            deal.notes.slice().reverse().forEach(note => {
+                notesHtml += `
+                    <div class="bg-gray-50 p-2 rounded mb-2 text-sm">
+                        <span class="text-gray-500">${note.timestamp.split('T')[0]}</span>
+                        <p class="text-gray-700">${escapeHtml(note.text)}</p>
+                    </div>
+                `;
+            });
+            notesHtml += '</div>';
+        }
+        document.getElementById('existingNotes').innerHTML = notesHtml;
+
+        document.getElementById('modal').classList.remove('hidden');
+        document.getElementById('modal').classList.add('flex');
+    }
+
+    function closeModal() {
+        document.getElementById('modal').classList.add('hidden');
+        document.getElementById('modal').classList.remove('flex');
+    }
+
+    // ============================================================================
+    // CRUD OPERATIONS
+    // ============================================================================
+
+    function saveDeal(e) {
+        e.preventDefault();
+        const data = loadData();
+        const id = document.getElementById('dealId').value;
+
+        const dealData = {
+            name: document.getElementById('dealName').value.trim(),
+            value: parseFloat(document.getElementById('dealValue').value) || 0,
+            stage: document.getElementById('dealStage').value,
+            contact: document.getElementById('dealContact').value.trim(),
+            email: document.getElementById('dealEmail').value.trim(),
+            phone: document.getElementById('dealPhone').value.trim(),
+            followupDate: document.getElementById('dealFollowup').value,
+            updatedAt: new Date().toISOString(),
+        };
+
+        const noteText = document.getElementById('dealNote').value.trim();
+
+        if (id) {
+            // Update existing deal
+            const deal = data.deals.find(d => d.id === parseInt(id));
+            if (deal) {
+                Object.assign(deal, dealData);
+                if (noteText) {
+                    deal.notes = deal.notes || [];
+                    deal.notes.push({ text: noteText, timestamp: new Date().toISOString() });
+                }
+            }
+        } else {
+            // Add new deal
+            const newDeal = {
+                id: data.nextId++,
+                ...dealData,
+                notes: noteText ? [{ text: noteText, timestamp: new Date().toISOString() }] : [],
+                createdAt: new Date().toISOString(),
+            };
+            data.deals.push(newDeal);
+        }
+
+        saveData(data);
+        closeModal();
+        renderPipeline();
+    }
+
+    function deleteDeal() {
+        const id = parseInt(document.getElementById('dealId').value);
+        if (!id) return;
+
+        if (confirm('Are you sure you want to delete this deal?')) {
+            const data = loadData();
+            data.deals = data.deals.filter(d => d.id !== id);
+            saveData(data);
+            closeModal();
+            renderPipeline();
+        }
+    }
+
+    // ============================================================================
+    // UTILITIES
+    // ============================================================================
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // ============================================================================
+    // EXPORT/IMPORT (for backup)
+    // ============================================================================
+
+    function exportData() {
+        const data = loadData();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `sales-pipeline-backup-${getToday()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function importData(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                if (data.deals && Array.isArray(data.deals)) {
+                    saveData(data);
+                    renderPipeline();
+                    alert('Data imported successfully!');
+                } else {
+                    alert('Invalid backup file format.');
+                }
+            } catch (err) {
+                alert('Error reading file: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // ============================================================================
+    // INITIALIZATION
+    // ============================================================================
+
+    document.addEventListener('DOMContentLoaded', function() {
+        populateStageSelect();
+        renderPipeline();
+
+        document.getElementById('dealForm').addEventListener('submit', saveDeal);
+
+        // Close modal on outside click
+        document.getElementById('modal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeModal();
+            if (e.key === 'n' && !e.ctrlKey && !e.metaKey &&
+                !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+                e.preventDefault();
+                showAddModal();
+            }
+        });
+
+        // Add export/import to header (hidden in a simple way)
+        console.log('Tip: Use exportData() and importData(file) in console to backup/restore your data');
+    });
+    </script>
+</body>
+</html>
