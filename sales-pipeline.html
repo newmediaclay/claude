@@ -109,6 +109,43 @@
         </div>
     </div>
 
+    <!-- Email Draft Modal -->
+    <div id="emailModal" class="modal fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center p-5 border-b">
+                <h2 class="text-xl font-bold">📧 Draft Follow-up Email</h2>
+                <button onclick="closeEmailModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            <div class="p-5 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">To</label>
+                    <input type="text" id="emailTo" readonly class="w-full px-3 py-2 border rounded-lg bg-gray-50">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                    <input type="text" id="emailSubject" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                    <textarea id="emailBody" rows="10" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Template</label>
+                    <select id="emailTemplate" onchange="applyEmailTemplate()" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button onclick="openInEmailClient()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-medium">
+                        📤 Open in Email Client
+                    </button>
+                    <button onclick="copyEmailToClipboard()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg font-medium">
+                        📋 Copy to Clipboard
+                    </button>
+                </div>
+                <p class="text-xs text-gray-500 text-center">Tip: Edit the template above before sending. Variables like {contact_name} are auto-filled.</p>
+            </div>
+        </div>
+    </div>
+
     <script>
     // ============================================================================
     // CONFIGURATION - Customize these to match your sales process
@@ -120,6 +157,74 @@
         { id: 'won', name: 'Won', color: 'bg-green-500', icon: '✓' },
         { id: 'lost', name: 'Lost', color: 'bg-gray-400', icon: '✗' },
     ];
+
+    // Email templates - customize these for your business!
+    // Available variables: {contact_name}, {contact_first_name}, {company}, {deal_value}, {your_name}
+    const EMAIL_TEMPLATES = [
+        {
+            id: 'followup_initial',
+            name: 'Initial Follow-up',
+            subject: 'Following up - {company}',
+            body: `Hi {contact_first_name},
+
+I wanted to follow up on our recent conversation about {company}.
+
+I'd love to schedule some time to discuss how we can help you achieve your goals. Would you have 15-20 minutes this week for a quick call?
+
+Looking forward to hearing from you.
+
+Best regards,
+{your_name}`
+        },
+        {
+            id: 'followup_proposal',
+            name: 'Proposal Follow-up',
+            subject: 'Checking in on our proposal - {company}',
+            body: `Hi {contact_first_name},
+
+I wanted to check in regarding the proposal I sent over for {company}.
+
+Have you had a chance to review it? I'd be happy to answer any questions or discuss any adjustments that might better fit your needs.
+
+Let me know if you'd like to schedule a call this week.
+
+Best regards,
+{your_name}`
+        },
+        {
+            id: 'followup_gentle',
+            name: 'Gentle Reminder',
+            subject: 'Quick check-in - {company}',
+            body: `Hi {contact_first_name},
+
+I hope this message finds you well. I wanted to gently follow up on our previous conversation.
+
+I understand things can get busy - just wanted to make sure this didn't slip through the cracks. Is there anything I can help clarify or any questions I can answer?
+
+No pressure at all - just let me know if and when you'd like to reconnect.
+
+Best,
+{your_name}`
+        },
+        {
+            id: 'followup_value',
+            name: 'Value Reminder',
+            subject: 'Thought you might find this helpful - {company}',
+            body: `Hi {contact_first_name},
+
+I was thinking about our conversation and wanted to share a quick thought that might be valuable for {company}.
+
+[Add your insight or value proposition here]
+
+Would love to discuss this further if you're interested. Let me know!
+
+Best regards,
+{your_name}`
+        }
+    ];
+
+    // Your name for email signatures (customize this!)
+    const YOUR_NAME = 'Your Name';
 
     const STORAGE_KEY = 'salesPipelineData';
 
@@ -211,6 +316,7 @@
     function renderDealCard(deal, today) {
         const isOverdue = deal.followupDate && deal.followupDate < today;
         const isDueToday = deal.followupDate === today;
+        const needsFollowup = isOverdue || isDueToday;
 
         return `
             <div class="deal-card bg-white rounded-lg p-3 shadow cursor-pointer" onclick="showEditModal(${deal.id})">
@@ -223,6 +329,11 @@
                     </div>
                 ` : ''}
                 ${deal.notes && deal.notes.length > 0 ? `<div class="text-gray-400 text-xs mt-2">📝 ${deal.notes.length} note${deal.notes.length > 1 ? 's' : ''}</div>` : ''}
+                ${needsFollowup && deal.email ? `
+                    <button onclick="event.stopPropagation(); showEmailModal(${deal.id})" class="mt-2 w-full bg-purple-500 hover:bg-purple-600 text-white text-xs py-1.5 px-2 rounded font-medium">
+                        ✉️ Draft Email
+                    </button>
+                ` : ''}
             </div>
         `;
     }
@@ -455,6 +566,125 @@
     }
 
     // ============================================================================
+    // EMAIL DRAFTING
+    // ============================================================================
+
+    let currentEmailDealId = null;
+
+    function showEmailModal(dealId) {
+        const deal = getDealById(dealId);
+        if (!deal) return;
+
+        currentEmailDealId = dealId;
+
+        // Populate template dropdown
+        const templateSelect = document.getElementById('emailTemplate');
+        templateSelect.innerHTML = EMAIL_TEMPLATES.map(t =>
+            `<option value="${t.id}">${t.name}</option>`
+        ).join('');
+
+        // Set the "to" field
+        document.getElementById('emailTo').value = deal.email || '';
+
+        // Apply the first template
+        applyEmailTemplate();
+
+        // Show modal
+        document.getElementById('emailModal').classList.remove('hidden');
+        document.getElementById('emailModal').classList.add('flex');
+    }
+
+    function closeEmailModal() {
+        document.getElementById('emailModal').classList.add('hidden');
+        document.getElementById('emailModal').classList.remove('flex');
+        currentEmailDealId = null;
+    }
+
+    function applyEmailTemplate() {
+        const deal = getDealById(currentEmailDealId);
+        if (!deal) return;
+
+        const templateId = document.getElementById('emailTemplate').value;
+        const template = EMAIL_TEMPLATES.find(t => t.id === templateId);
+        if (!template) return;
+
+        // Replace variables in template
+        const variables = {
+            '{contact_name}': deal.contact || 'there',
+            '{contact_first_name}': (deal.contact || 'there').split(' ')[0],
+            '{company}': deal.name || 'your company',
+            '{deal_value}': formatCurrency(deal.value),
+            '{your_name}': YOUR_NAME
+        };
+
+        let subject = template.subject;
+        let body = template.body;
+
+        Object.keys(variables).forEach(key => {
+            subject = subject.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), variables[key]);
+            body = body.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), variables[key]);
+        });
+
+        document.getElementById('emailSubject').value = subject;
+        document.getElementById('emailBody').value = body;
+    }
+
+    function openInEmailClient() {
+        const to = document.getElementById('emailTo').value;
+        const subject = document.getElementById('emailSubject').value;
+        const body = document.getElementById('emailBody').value;
+
+        const mailtoLink = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.location.href = mailtoLink;
+
+        // Add a note to the deal that email was drafted
+        if (currentEmailDealId) {
+            const data = loadData();
+            const deal = data.deals.find(d => d.id === currentEmailDealId);
+            if (deal) {
+                deal.notes = deal.notes || [];
+                deal.notes.push({
+                    text: `📧 Follow-up email drafted: "${subject}"`,
+                    timestamp: new Date().toISOString()
+                });
+                saveData(data);
+                renderPipeline();
+            }
+        }
+
+        closeEmailModal();
+    }
+
+    function copyEmailToClipboard() {
+        const subject = document.getElementById('emailSubject').value;
+        const body = document.getElementById('emailBody').value;
+        const fullEmail = `Subject: ${subject}\n\n${body}`;
+
+        navigator.clipboard.writeText(fullEmail).then(() => {
+            alert('Email copied to clipboard!');
+
+            // Add a note to the deal
+            if (currentEmailDealId) {
+                const data = loadData();
+                const deal = data.deals.find(d => d.id === currentEmailDealId);
+                if (deal) {
+                    deal.notes = deal.notes || [];
+                    deal.notes.push({
+                        text: `📧 Follow-up email drafted: "${subject}"`,
+                        timestamp: new Date().toISOString()
+                    });
+                    saveData(data);
+                    renderPipeline();
+                }
+            }
+
+            closeEmailModal();
+        }).catch(err => {
+            alert('Failed to copy: ' + err);
+        });
+    }
+
+    // ============================================================================
     // SAMPLE DATA (for testing)
     // ============================================================================
 
@@ -497,14 +727,20 @@
 
         document.getElementById('dealForm').addEventListener('submit', saveDeal);
 
-        // Close modal on outside click
+        // Close modals on outside click
         document.getElementById('modal').addEventListener('click', function(e) {
             if (e.target === this) closeModal();
+        });
+        document.getElementById('emailModal').addEventListener('click', function(e) {
+            if (e.target === this) closeEmailModal();
         });
 
         // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') closeModal();
+            if (e.key === 'Escape') {
+                closeModal();
+                closeEmailModal();
+            }
             if (e.key === 'n' && !e.ctrlKey && !e.metaKey &&
                 !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
                 e.preventDefault();
