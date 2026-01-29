@@ -13,6 +13,17 @@ from flask import Flask, render_template_string, request, redirect, url_for, jso
 
 app = Flask(__name__)
 
+# Middleware to rewrite Host header to localhost (bypass host validation)
+class HostRewriter:
+    def __init__(self, app):
+        self.app = app
+    def __call__(self, environ, start_response):
+        environ['HTTP_HOST'] = 'localhost:5000'
+        environ['SERVER_NAME'] = 'localhost'
+        return self.app(environ, start_response)
+
+app.wsgi_app = HostRewriter(app.wsgi_app)
+
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
@@ -552,8 +563,13 @@ def delete_deal(deal_id):
 # ============================================================================
 
 if __name__ == "__main__":
+    import socket
+    hostname = socket.gethostname()
+    ip = socket.gethostbyname(hostname)
     print("\n  Sales Pipeline - Web Interface")
     print("  " + "="*40)
-    print("  Open http://localhost:5000 in your browser")
+    print(f"  Open http://{ip}:5000 in your browser")
     print("  Press Ctrl+C to stop\n")
-    app.run(debug=True, port=5000)
+
+    from werkzeug.serving import run_simple
+    run_simple('0.0.0.0', 5000, app, use_reloader=False, use_debugger=False)
