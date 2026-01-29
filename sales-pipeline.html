@@ -98,7 +98,7 @@
                 <div id="existingNotes" class="space-y-2"></div>
 
                 <div class="flex gap-3 pt-2">
-                    <button type="submit" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-medium">
+                    <button type="submit" id="submitBtn" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-medium">
                         Save Deal
                     </button>
                     <button type="button" id="deleteBtn" onclick="deleteDeal()" class="hidden bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg font-medium">
@@ -297,6 +297,7 @@
 
     function showAddModal() {
         document.getElementById('modalTitle').textContent = 'Add New Deal';
+        document.getElementById('submitBtn').textContent = 'Save Deal';
         document.getElementById('dealForm').reset();
         document.getElementById('dealId').value = '';
         document.getElementById('deleteBtn').classList.add('hidden');
@@ -311,6 +312,7 @@
         if (!deal) return;
 
         document.getElementById('modalTitle').textContent = 'Edit Deal';
+        document.getElementById('submitBtn').textContent = 'Update Deal';
         document.getElementById('dealId').value = deal.id;
         document.getElementById('dealName').value = deal.name;
         document.getElementById('dealValue').value = deal.value || '';
