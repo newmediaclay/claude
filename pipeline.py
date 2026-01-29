@@ -3,11 +3,11 @@
 Sales Pipeline Tracker - A simple CLI tool for managing sales prospects.
 
 Usage:
-    python pipeline.py add "Company Name" --value 10000 --stage lead --contact "John Doe"
+    python pipeline.py add "Company Name" --value 10000 --stage contact --contact "John Doe"
     python pipeline.py list
-    python pipeline.py list --stage proposal
+    python pipeline.py list --stage proposal_sent
     python pipeline.py show 1
-    python pipeline.py update 1 --stage proposal --value 15000
+    python pipeline.py update 1 --stage proposal_sent --value 15000
     python pipeline.py note 1 "Follow up next Tuesday about pricing"
     python pipeline.py followup 1 "2024-02-15"
     python pipeline.py delete 1
@@ -29,17 +29,14 @@ DATA_FILE = Path(__file__).parent / "data" / "deals.json"
 
 # Sales pipeline stages - customize these to match your process
 STAGES = [
-    "lead",        # Initial contact/prospect identified
-    "contacted",   # First outreach made
-    "qualified",   # Confirmed as a good fit
-    "proposal",    # Proposal/quote sent
-    "negotiation", # In active negotiation
-    "won",         # Deal closed successfully
-    "lost",        # Deal lost
+    "contact",       # Initial contact/prospect identified
+    "proposal_sent", # Proposal/quote sent
+    "won",           # Deal closed successfully
+    "lost",          # Deal lost
 ]
 
 # Default stage for new deals
-DEFAULT_STAGE = "lead"
+DEFAULT_STAGE = "contact"
 
 # Currency symbol for display
 CURRENCY = "$"
@@ -87,11 +84,8 @@ def format_date(date_str: Optional[str]) -> str:
 def stage_indicator(stage: str) -> str:
     """Return a visual indicator for the stage."""
     indicators = {
-        "lead": "○",
-        "contacted": "◐",
-        "qualified": "◑",
-        "proposal": "◕",
-        "negotiation": "●",
+        "contact": "○",
+        "proposal_sent": "◕",
         "won": "✓",
         "lost": "✗",
     }

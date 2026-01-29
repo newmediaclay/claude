@@ -31,21 +31,15 @@ app.wsgi_app = HostRewriter(app.wsgi_app)
 DATA_FILE = Path(__file__).parent / "data" / "deals.json"
 
 STAGES = [
-    ("lead", "Lead", "○"),
-    ("contacted", "Contacted", "◐"),
-    ("qualified", "Qualified", "◑"),
-    ("proposal", "Proposal", "◕"),
-    ("negotiation", "Negotiation", "●"),
+    ("contact", "Contact", "○"),
+    ("proposal_sent", "Proposal Sent", "◕"),
     ("won", "Won", "✓"),
     ("lost", "Lost", "✗"),
 ]
 
 STAGE_COLORS = {
-    "lead": "#6b7280",
-    "contacted": "#3b82f6",
-    "qualified": "#8b5cf6",
-    "proposal": "#f59e0b",
-    "negotiation": "#ef4444",
+    "contact": "#3b82f6",
+    "proposal_sent": "#f59e0b",
     "won": "#10b981",
     "lost": "#9ca3af",
 }
@@ -260,6 +254,41 @@ HTML_TEMPLATE = """
 
         .actions { display: flex; gap: 10px; margin-top: 20px; }
         .actions .btn { flex: 1; }
+
+        /* Alert Banner */
+        .alert-banner {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-left: 4px solid #ef4444;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+        }
+        .alert-banner h3 {
+            color: #dc2626;
+            font-size: 1rem;
+            margin-bottom: 10px;
+        }
+        .alert-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #fecaca;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .alert-item:last-child { border-bottom: none; }
+        .alert-item .deal-name { font-weight: 500; }
+        .alert-item .due-date { color: #dc2626; font-size: 0.9rem; }
+        .alert-item .view-btn {
+            background: #dc2626;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .alert-item .view-btn:hover { background: #b91c1c; }
     </style>
 </head>
 <body>
@@ -275,6 +304,19 @@ HTML_TEMPLATE = """
     </header>
 
     <div class="container">
+        {% if overdue_deals %}
+        <div class="alert-banner">
+            <h3>Follow-ups Due</h3>
+            {% for deal in overdue_deals %}
+            <div class="alert-item">
+                <span class="deal-name">{{ deal.name }}</span>
+                <span class="due-date">{{ deal.followup_date }}{% if deal.followup_date < today %} (OVERDUE){% endif %}</span>
+                <span class="view-btn" onclick="showDeal({{ deal.id }})">View</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         <div class="pipeline">
             {% for stage_id, stage_name, stage_icon in stages %}
             {% if stage_id not in ['won', 'lost'] %}
@@ -373,7 +415,7 @@ HTML_TEMPLATE = """
                     </div>
                     <div id="existingNotes"></div>
                     <div class="actions">
-                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="submit" class="btn btn-primary" id="submitBtn">Add Deal</button>
                         <button type="button" class="btn btn-danger" id="deleteBtn" onclick="deleteDeal()" style="display:none">Delete</button>
                     </div>
                 </form>
@@ -390,6 +432,7 @@ HTML_TEMPLATE = """
             document.getElementById('dealForm').reset();
             document.getElementById('dealId').value = '';
             document.getElementById('deleteBtn').style.display = 'none';
+            document.getElementById('submitBtn').textContent = 'Add Deal';
             document.getElementById('existingNotes').innerHTML = '';
             document.getElementById('dealModal').classList.add('active');
         }
@@ -410,6 +453,7 @@ HTML_TEMPLATE = """
             document.getElementById('dealFollowup').value = deal.followup_date || '';
             document.getElementById('dealNote').value = '';
             document.getElementById('deleteBtn').style.display = 'block';
+            document.getElementById('submitBtn').textContent = 'Update Deal';
 
             // Show existing notes
             let notesHtml = '';
@@ -479,6 +523,11 @@ def index():
     active_deals = [d for d in deals if d["stage"] not in ["won", "lost"]]
     won_deals = [d for d in deals if d["stage"] == "won"]
 
+    # Find overdue/due follow-ups
+    overdue_deals = [d for d in active_deals
+                     if d.get("followup_date") and d["followup_date"] <= today]
+    overdue_deals.sort(key=lambda d: d["followup_date"])
+
     return render_template_string(
         HTML_TEMPLATE,
         deals=deals,
@@ -491,6 +540,7 @@ def index():
         active_value=sum(d["value"] for d in active_deals),
         won_count=len(won_deals),
         won_value=sum(d["value"] for d in won_deals),
+        overdue_deals=overdue_deals,
     )
 
 @app.route("/add", methods=["POST"])
@@ -501,7 +551,7 @@ def add_deal():
         "id": data["next_id"],
         "name": request.form["name"],
         "value": float(request.form.get("value") or 0),
-        "stage": request.form.get("stage", "lead"),
+        "stage": request.form.get("stage", "contact"),
         "contact": request.form.get("contact", ""),
         "email": request.form.get("email", ""),
         "phone": request.form.get("phone", ""),
