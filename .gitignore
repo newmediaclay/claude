@@ -4,3 +4,6 @@ data/deals.json
 # Python cache
 __pycache__/
 *.pyc
+
+# Generated archives
+*.zip
