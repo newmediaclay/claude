@@ -48,62 +48,73 @@ STAGE_COLORS = {
     "lost": "#6b7280",
 }
 
-# Email Templates
+# Email Templates - Escalating based on follow-up count
 EMAIL_TEMPLATES = {
-    "initial_followup": {
-        "name": "Initial Follow-up",
-        "subject": "Following up on our conversation",
+    "followup_1": {
+        "name": "1st Follow-up (Chill)",
+        "subject": "Just checking in",
         "body": """Hi {contact_first_name},
 
-I hope this message finds you well! I wanted to follow up on our recent conversation about how we might be able to help {company}.
+I hope you're doing well! I wanted to follow up on our conversation and the proposal we sent over for {company}.
 
-I'd love to schedule a quick call to discuss your needs in more detail and answer any questions you might have.
+Just wanted to make sure everything came through okay and see if you had any initial questions.
 
-Would you have some time this week for a brief chat?
-
-Best regards,
-{your_name}"""
-    },
-    "proposal_followup": {
-        "name": "Proposal Follow-up",
-        "subject": "Following up on our proposal",
-        "body": """Hi {contact_first_name},
-
-I wanted to check in regarding the proposal we sent over for {company}. I hope you've had a chance to review it.
-
-I'm happy to walk through any details or answer questions you might have. We're excited about the possibility of working together!
-
-Do you have any questions I can help address?
-
-Best regards,
-{your_name}"""
-    },
-    "gentle_reminder": {
-        "name": "Gentle Reminder",
-        "subject": "Quick check-in",
-        "body": """Hi {contact_first_name},
-
-I hope you're doing well! I wanted to send a quick note to see if you had any updates on your timeline for moving forward.
-
-No pressure at all - I just wanted to make sure I'm available whenever you're ready to chat.
-
-Let me know if there's anything I can help with!
+No rush at all - whenever you have a chance to review, I'm happy to chat!
 
 Best,
 {your_name}"""
     },
-    "value_reminder": {
-        "name": "Value Reminder",
-        "subject": "Thinking about {company}",
+    "followup_2": {
+        "name": "2nd Follow-up (Friendly)",
+        "subject": "Following up on our proposal",
         "body": """Hi {contact_first_name},
 
-I was thinking about our conversation and wanted to share a quick thought about how we could help {company} achieve your goals.
+I wanted to circle back on the proposal we discussed for {company}. I hope you've had a chance to review it.
 
-Based on what you shared, I believe we could make a real impact, especially given the ${deal_value} investment we discussed.
+I'm happy to walk through any details or answer questions you might have. We're excited about the possibility of working together!
 
-Would you be open to a brief call to explore this further?
+Would you have some time this week to connect?
 
-Looking forward to hearing from you,
+Best regards,
+{your_name}"""
+    },
+    "followup_3": {
+        "name": "3rd Follow-up (Direct)",
+        "subject": "Quick check-in on {company}",
+        "body": """Hi {contact_first_name},
+
+I've reached out a couple of times now regarding the proposal for {company} and wanted to check in once more.
+
+I understand timing can be tricky - if now isn't the right time, just let me know and I'll follow up at a better date. If things have changed on your end, I'd appreciate a quick update so I can adjust accordingly.
+
+Looking forward to hearing from you either way.
+
+Best,
+{your_name}"""
+    },
+    "followup_4": {
+        "name": "4th+ Follow-up (Final Check)",
+        "subject": "Should I close the loop?",
+        "body": """Hi {contact_first_name},
+
+I've followed up a few times now on our proposal for {company} and haven't heard back, so I wanted to check in one last time.
+
+I completely understand if the timing isn't right or if you've decided to go in a different direction - no hard feelings at all. If that's the case, just let me know and I'll close out my notes on this.
+
+If there's still interest, I'm happy to reconnect whenever works for you.
+
+Thanks for your time either way.
+
+{your_name}"""
+    },
+    "custom": {
+        "name": "Custom Template",
+        "subject": "Following up",
+        "body": """Hi {contact_first_name},
+
+[Your message here]
+
+Best,
 {your_name}"""
     }
 }
@@ -596,6 +607,24 @@ HTML_TEMPLATE = """
             justify-content: center;
             gap: 8px;
         }
+        /* Follow-up count badge */
+        .followup-badge {
+            display: inline-block;
+            background: #0077ff;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        .followup-badge.warning { background: #f59e0b; }
+        .followup-badge.danger { background: #ef4444; }
+        .deal-followup-count {
+            font-size: 0.7rem;
+            color: #6b7280;
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body>
@@ -670,10 +699,13 @@ HTML_TEMPLATE = """
                         {% if deal.followup_date %}
                         <div class="deal-followup {{ 'overdue' if deal.followup_date <= today else '' }}">
                             Follow-up: {{ deal.followup_date }}
+                            {% if deal.get('followup_count', 0) >= 2 %}
+                            <span style="opacity: 0.7;">(#{{ deal.get('followup_count', 1) }})</span>
+                            {% endif %}
                         </div>
                         {% endif %}
                         {% if deal.email and deal.followup_date and deal.followup_date <= today %}
-                        <button class="deal-email-btn" onclick="event.stopPropagation(); showEmailModal({{ deal.id }})">✉️ Draft Email</button>
+                        <button class="deal-email-btn" onclick="event.stopPropagation(); showEmailModal({{ deal.id }})">✉️ Draft #{{ deal.get('followup_count', 1) }}</button>
                         {% endif %}
                     </div>
                     {% endfor %}
@@ -791,12 +823,13 @@ HTML_TEMPLATE = """
             <div class="modal-body">
                 <input type="hidden" id="emailDealId">
                 <div class="form-group template-select">
-                    <label>Template</label>
+                    <label>Template <span id="followupCountBadge" class="followup-badge"></span></label>
                     <select id="emailTemplate" onchange="updateEmailPreview()">
-                        <option value="initial_followup">Initial Follow-up</option>
-                        <option value="proposal_followup">Proposal Follow-up</option>
-                        <option value="gentle_reminder">Gentle Reminder</option>
-                        <option value="value_reminder">Value Reminder</option>
+                        <option value="followup_1">1st Follow-up (Chill)</option>
+                        <option value="followup_2">2nd Follow-up (Friendly)</option>
+                        <option value="followup_3">3rd Follow-up (Direct)</option>
+                        <option value="followup_4">4th+ Follow-up (Final Check)</option>
+                        <option value="custom">Custom Template</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -888,7 +921,31 @@ HTML_TEMPLATE = """
 
             document.getElementById('emailDealId').value = dealId;
             document.getElementById('emailTo').value = currentEmailDeal.email;
-            document.getElementById('emailTemplate').value = 'initial_followup';
+
+            // Auto-select template based on follow-up count
+            const count = currentEmailDeal.followup_count || 1;
+            let templateKey;
+            let badgeClass = '';
+            if (count <= 1) {
+                templateKey = 'followup_1';
+            } else if (count === 2) {
+                templateKey = 'followup_2';
+                badgeClass = '';
+            } else if (count === 3) {
+                templateKey = 'followup_3';
+                badgeClass = 'warning';
+            } else {
+                templateKey = 'followup_4';
+                badgeClass = 'danger';
+            }
+
+            document.getElementById('emailTemplate').value = templateKey;
+
+            // Update badge
+            const badge = document.getElementById('followupCountBadge');
+            badge.textContent = `Follow-up #${count}`;
+            badge.className = 'followup-badge' + (badgeClass ? ' ' + badgeClass : '');
+
             updateEmailPreview();
             document.getElementById('emailModal').classList.add('active');
         }
@@ -1043,6 +1100,7 @@ def add_deal():
         "email": request.form.get("email", ""),
         "phone": request.form.get("phone", ""),
         "followup_date": request.form.get("followup", ""),
+        "followup_count": 1 if request.form.get("followup") else 0,
         "notes": [],
         "created_at": datetime.now().isoformat(),
         "updated_at": datetime.now().isoformat(),
@@ -1074,7 +1132,14 @@ def update_deal():
         deal["contact"] = request.form.get("contact", "")
         deal["email"] = request.form.get("email", "")
         deal["phone"] = request.form.get("phone", "")
-        deal["followup_date"] = request.form.get("followup", "")
+
+        # Track follow-up count when date changes
+        new_followup = request.form.get("followup", "")
+        old_followup = deal.get("followup_date", "")
+        if new_followup and new_followup != old_followup:
+            deal["followup_count"] = deal.get("followup_count", 0) + 1
+        deal["followup_date"] = new_followup
+
         deal["updated_at"] = datetime.now().isoformat()
 
         note_text = request.form.get("note", "").strip()
