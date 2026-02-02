@@ -1057,9 +1057,13 @@ def index():
             deals_by_stage[stage] = []
         deals_by_stage[stage].append(deal)
 
-    # Sort each stage by value descending
+    # Sort each stage by follow-up date (soonest first, no date at bottom)
     for stage in deals_by_stage:
-        deals_by_stage[stage].sort(key=lambda d: -d["value"])
+        deals_by_stage[stage].sort(key=lambda d: (
+            0 if d.get("followup_date") else 1,  # Has date first
+            d.get("followup_date", "9999-99-99"),  # Then by date ascending
+            -d["value"]  # Then by value descending as tiebreaker
+        ))
 
     # Calculate stats
     active_deals = [d for d in deals if d["stage"] not in ["won", "lost"]]
