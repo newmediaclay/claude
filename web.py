@@ -49,72 +49,51 @@ STAGE_COLORS = {
 }
 
 # Email Templates - Escalating based on follow-up count
+# Placeholders: {contact_first_name}, {company}, {deal_value}, {your_name}, {notes_context}
 EMAIL_TEMPLATES = {
     "followup_1": {
-        "name": "1st Follow-up (Chill)",
-        "subject": "Just checking in",
-        "body": """Hi {contact_first_name},
+        "name": "1st Follow-up (Quick Check-in)",
+        "subject": "Quick check-in",
+        "body": """Hey {contact_first_name},
 
-I hope you're doing well! I wanted to follow up on our conversation and the proposal we sent over for {company}.
+Hope you're doing well! Just wanted to touch base on {company} and see how things are going on your end.
+{notes_context}
+Let me know if you have any questions or want to chat - no rush at all!
 
-Just wanted to make sure everything came through okay and see if you had any initial questions.
-
-No rush at all - whenever you have a chance to review, I'm happy to chat!
-
-Best,
 {your_name}"""
     },
     "followup_2": {
-        "name": "2nd Follow-up (Friendly)",
-        "subject": "Following up on our proposal",
-        "body": """Hi {contact_first_name},
+        "name": "2nd Follow-up (Progress Check)",
+        "subject": "Any updates on {company}?",
+        "body": """Hey {contact_first_name},
 
-I wanted to circle back on the proposal we discussed for {company}. I hope you've had a chance to review it.
+Wanted to circle back and see if there's been any progress or updates on your end regarding {company}.
+{notes_context}
+Is there anything I can help with or any questions I can answer? Happy to jump on a quick call if that's easier.
 
-I'm happy to walk through any details or answer questions you might have. We're excited about the possibility of working together!
-
-Would you have some time this week to connect?
-
-Best regards,
+Talk soon,
 {your_name}"""
     },
     "followup_3": {
-        "name": "3rd Follow-up (Direct)",
-        "subject": "Quick check-in on {company}",
-        "body": """Hi {contact_first_name},
+        "name": "3rd Follow-up (Still Interested?)",
+        "subject": "Still interested in moving forward?",
+        "body": """Hey {contact_first_name},
 
-I've reached out a couple of times now regarding the proposal for {company} and wanted to check in once more.
+I've reached out a couple times now about {company} and wanted to check in one more time.
+{notes_context}
+Totally understand if the timing isn't right or priorities have shifted - just let me know either way so I can plan accordingly. If there's still interest, I'm happy to reconnect whenever works for you.
 
-I understand timing can be tricky - if now isn't the right time, just let me know and I'll follow up at a better date. If things have changed on your end, I'd appreciate a quick update so I can adjust accordingly.
-
-Looking forward to hearing from you either way.
-
-Best,
-{your_name}"""
-    },
-    "followup_4": {
-        "name": "4th+ Follow-up (Final Check)",
-        "subject": "Should I close the loop?",
-        "body": """Hi {contact_first_name},
-
-I've followed up a few times now on our proposal for {company} and haven't heard back, so I wanted to check in one last time.
-
-I completely understand if the timing isn't right or if you've decided to go in a different direction - no hard feelings at all. If that's the case, just let me know and I'll close out my notes on this.
-
-If there's still interest, I'm happy to reconnect whenever works for you.
-
-Thanks for your time either way.
+No pressure at all - just want to make sure I'm not leaving you hanging!
 
 {your_name}"""
     },
     "custom": {
         "name": "Custom Template",
         "subject": "Following up",
-        "body": """Hi {contact_first_name},
-
+        "body": """Hey {contact_first_name},
+{notes_context}
 [Your message here]
 
-Best,
 {your_name}"""
     }
 }
@@ -625,6 +604,42 @@ HTML_TEMPLATE = """
             color: #6b7280;
             margin-top: 4px;
         }
+        /* Email notes context */
+        .email-notes-context {
+            margin-bottom: 16px;
+        }
+        .email-notes-context label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #374151;
+            font-size: 0.9rem;
+        }
+        .notes-preview {
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.85rem;
+            color: #92400e;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+        .notes-preview .note-preview-item {
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #fcd34d;
+        }
+        .notes-preview .note-preview-item:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+        .notes-preview .note-date {
+            font-size: 0.7rem;
+            color: #b45309;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -825,12 +840,15 @@ HTML_TEMPLATE = """
                 <div class="form-group template-select">
                     <label>Template <span id="followupCountBadge" class="followup-badge"></span></label>
                     <select id="emailTemplate" onchange="updateEmailPreview()">
-                        <option value="followup_1">1st Follow-up (Chill)</option>
-                        <option value="followup_2">2nd Follow-up (Friendly)</option>
-                        <option value="followup_3">3rd Follow-up (Direct)</option>
-                        <option value="followup_4">4th+ Follow-up (Final Check)</option>
+                        <option value="followup_1">1st Follow-up (Quick Check-in)</option>
+                        <option value="followup_2">2nd Follow-up (Progress Check)</option>
+                        <option value="followup_3">3rd+ Follow-up (Still Interested?)</option>
                         <option value="custom">Custom Template</option>
                     </select>
+                </div>
+                <div id="emailNotesContext" class="email-notes-context" style="display: none;">
+                    <label>Recent Notes (for context)</label>
+                    <div id="emailNotesContent" class="notes-preview"></div>
                 </div>
                 <div class="form-group">
                     <label>To</label>
@@ -922,7 +940,7 @@ HTML_TEMPLATE = """
             document.getElementById('emailDealId').value = dealId;
             document.getElementById('emailTo').value = currentEmailDeal.email;
 
-            // Auto-select template based on follow-up count
+            // Auto-select template based on follow-up count (3 stages)
             const count = currentEmailDeal.followup_count || 1;
             let templateKey;
             let badgeClass = '';
@@ -930,12 +948,9 @@ HTML_TEMPLATE = """
                 templateKey = 'followup_1';
             } else if (count === 2) {
                 templateKey = 'followup_2';
-                badgeClass = '';
-            } else if (count === 3) {
-                templateKey = 'followup_3';
                 badgeClass = 'warning';
             } else {
-                templateKey = 'followup_4';
+                templateKey = 'followup_3';
                 badgeClass = 'danger';
             }
 
@@ -945,6 +960,24 @@ HTML_TEMPLATE = """
             const badge = document.getElementById('followupCountBadge');
             badge.textContent = `Follow-up #${count}`;
             badge.className = 'followup-badge' + (badgeClass ? ' ' + badgeClass : '');
+
+            // Show notes context if deal has notes (excluding email log entries)
+            const notesContainer = document.getElementById('emailNotesContext');
+            const notesContent = document.getElementById('emailNotesContent');
+            const relevantNotes = (currentEmailDeal.notes || [])
+                .filter(n => !n.text.startsWith('📧'))
+                .slice(-3);  // Show last 3 relevant notes
+
+            if (relevantNotes.length > 0) {
+                let notesHtml = '';
+                relevantNotes.forEach(note => {
+                    notesHtml += `<div class="note-preview-item"><span class="note-date">${note.timestamp.slice(0,10)}</span><br>${note.text}</div>`;
+                });
+                notesContent.innerHTML = notesHtml;
+                notesContainer.style.display = 'block';
+            } else {
+                notesContainer.style.display = 'none';
+            }
 
             updateEmailPreview();
             document.getElementById('emailModal').classList.add('active');
@@ -968,12 +1001,30 @@ HTML_TEMPLATE = """
         }
 
         function fillTemplate(text, deal, firstName) {
+            // Generate notes context - extract key points from recent notes
+            let notesContext = '';
+            const relevantNotes = (deal.notes || [])
+                .filter(n => !n.text.startsWith('📧'))  // Exclude email log entries
+                .slice(-2);  // Last 2 relevant notes
+
+            if (relevantNotes.length > 0) {
+                // Create a brief context line from notes
+                const latestNote = relevantNotes[relevantNotes.length - 1].text;
+                // Keep it short and conversational
+                if (latestNote.length <= 100) {
+                    notesContext = `\nLast we chatted, you mentioned: "${latestNote}"\n`;
+                } else {
+                    notesContext = `\nLast we chatted, you mentioned: "${latestNote.substring(0, 100)}..."\n`;
+                }
+            }
+
             return text
                 .replace(/{contact_name}/g, deal.contact || 'there')
                 .replace(/{contact_first_name}/g, firstName)
                 .replace(/{company}/g, deal.name)
                 .replace(/{deal_value}/g, deal.value ? deal.value.toLocaleString() : '0')
-                .replace(/{your_name}/g, yourName);
+                .replace(/{your_name}/g, yourName)
+                .replace(/{notes_context}/g, notesContext);
         }
 
         function openInEmailClient() {
