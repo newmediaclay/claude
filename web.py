@@ -8,9 +8,18 @@ Then open: http://localhost:5000
 """
 
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, render_template_string, request, redirect, url_for, jsonify
+
+# Optional: SendGrid for email notifications
+try:
+    from sendgrid import SendGridAPIClient
+    from sendgrid.helpers.mail import Mail
+    SENDGRID_AVAILABLE = True
+except ImportError:
+    SENDGRID_AVAILABLE = False
 
 app = Flask(__name__)
 
@@ -47,6 +56,41 @@ STAGE_COLORS = {
     "won": "#059669",
     "lost": "#6b7280",
 }
+
+# ============================================================================
+# EMAIL NOTIFICATION SETTINGS
+# ============================================================================
+# Set these environment variables on PythonAnywhere:
+#   SENDGRID_API_KEY - Your SendGrid API key
+#   NOTIFICATION_EMAIL - Email address to receive daily digests
+#   APP_URL - Your app URL (e.g., https://sales.clayschossow.com)
+#   DIGEST_SECRET - Secret key to protect the digest endpoint
+
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
+NOTIFICATION_EMAIL = os.environ.get("NOTIFICATION_EMAIL", "clay@clayschossow.com")
+FROM_EMAIL = os.environ.get("FROM_EMAIL", "noreply@clayschossow.com")
+APP_URL = os.environ.get("APP_URL", "http://localhost:5000")
+DIGEST_SECRET = os.environ.get("DIGEST_SECRET", "change-me-in-production")
+
+def send_notification_email(subject: str, html_content: str) -> bool:
+    """Send an email notification via SendGrid"""
+    if not SENDGRID_AVAILABLE or not SENDGRID_API_KEY:
+        print(f"SendGrid not configured. Would send: {subject}")
+        return False
+
+    message = Mail(
+        from_email=FROM_EMAIL,
+        to_emails=NOTIFICATION_EMAIL,
+        subject=subject,
+        html_content=html_content
+    )
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        sg.send(message)
+        return True
+    except Exception as e:
+        print(f"Email send failed: {e}")
+        return False
 
 # Email Templates - Escalating based on follow-up count
 # Placeholders: {contact_first_name}, {company}, {deal_value}, {your_name}, {notes_context}
@@ -1233,6 +1277,107 @@ def log_email():
         save_data(data)
 
     return jsonify({"success": True})
+
+@app.route("/send-digest")
+def send_digest():
+    """
+    Send daily digest email with due follow-ups.
+    Called by PythonAnywhere scheduled task.
+    Protect with secret key: /send-digest?key=YOUR_SECRET
+    """
+    # Verify secret key
+    provided_key = request.args.get("key", "")
+    if provided_key != DIGEST_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = load_data()
+    deals = data["deals"]
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    # Find due/overdue follow-ups (active deals only)
+    active_deals = [d for d in deals if d["stage"] not in ["won", "lost"]]
+    due_deals = [d for d in active_deals
+                 if d.get("followup_date") and d["followup_date"] <= today]
+    due_deals.sort(key=lambda d: d["followup_date"])
+
+    if not due_deals:
+        return jsonify({"message": "No follow-ups due today", "sent": False})
+
+    # Build email HTML
+    overdue_count = sum(1 for d in due_deals if d["followup_date"] < today)
+    today_count = len(due_deals) - overdue_count
+
+    subject = f"📋 {len(due_deals)} Follow-up{'s' if len(due_deals) > 1 else ''} Due"
+    if overdue_count > 0:
+        subject += f" ({overdue_count} overdue)"
+
+    deals_html = ""
+    for deal in due_deals:
+        status = "🔴 OVERDUE" if deal["followup_date"] < today else "🟡 Due today"
+        contact = f" ({deal['contact']})" if deal.get('contact') else ""
+        value = f"${deal['value']:,.0f}" if deal.get('value') else ""
+        followup_num = deal.get('followup_count', 1)
+
+        deals_html += f"""
+        <tr>
+            <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">
+                <strong>{deal['name']}</strong>{contact}<br>
+                <span style="color: #059669; font-weight: 600;">{value}</span>
+            </td>
+            <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">
+                {deal['followup_date']}<br>
+                <span style="font-size: 12px; color: #6b7280;">Follow-up #{followup_num}</span>
+            </td>
+            <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">
+                {status}
+            </td>
+        </tr>
+        """
+
+    html_content = f"""
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0; font-size: 20px;">📋 Sales Pipeline - Follow-ups Due</h1>
+            <p style="margin: 8px 0 0 0; opacity: 0.8; font-size: 14px;">New Media Campaigns</p>
+        </div>
+
+        <div style="background: white; padding: 20px; border: 1px solid #e2e8f0; border-top: none;">
+            <p style="margin: 0 0 16px 0; color: #475569;">
+                Hey {YOUR_NAME}, you have <strong>{len(due_deals)} follow-up{'s' if len(due_deals) > 1 else ''}</strong> that need attention:
+            </p>
+
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #f8fafc;">
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Deal</th>
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Due Date</th>
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {deals_html}
+                </tbody>
+            </table>
+
+            <div style="margin-top: 24px; text-align: center;">
+                <a href="{APP_URL}" style="display: inline-block; background: #0077ff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">
+                    Open Pipeline →
+                </a>
+            </div>
+        </div>
+
+        <div style="padding: 16px; text-align: center; color: #94a3b8; font-size: 12px;">
+            Sent from your Sales Pipeline Tracker
+        </div>
+    </div>
+    """
+
+    sent = send_notification_email(subject, html_content)
+    return jsonify({
+        "message": f"Digest {'sent' if sent else 'would be sent (SendGrid not configured)'}",
+        "deals_due": len(due_deals),
+        "sent": sent
+    })
 
 # ============================================================================
 # MAIN
